@@ -1,5 +1,4 @@
 # KeyVault
-<<<<<<< HEAD
 
 KeyVault is a distributed key-value database written in C++.
 
@@ -15,6 +14,21 @@ single-node, in-memory key-value engine.
 
 The data currently lives only in memory. It will disappear when the program
 stops. Persistence will be added in a later milestone.
+
+## Interactive commands
+
+After starting KeyVault, enter one command per line:
+
+```text
+PUT name Donna Banerjee
+GET name
+SIZE
+DELETE name
+EXIT
+```
+
+Commands are not case-sensitive, so `get name` and `GET name` behave the same.
+Keys cannot contain spaces yet, but values can contain spaces.
 
 ## Requirements
 
@@ -32,12 +46,6 @@ cmake --build build
 Expected output:
 
 ```text
-Stored two key-value pairs.
-GET name: Donna
-DELETE project: success
-GET project: key not found
-Keys remaining: 1
+KeyVault is running. Type HELP to see the commands.
+keyvault>
 ```
-=======
-Distributed Key-Value Database
->>>>>>> 60636eeba1ecea8db588f489e3aec1f7bbabbb19
