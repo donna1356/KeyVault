@@ -1,4 +1,5 @@
 # KeyVault
+<<<<<<< HEAD
 
 KeyVault is a distributed key-value database written in C++.
 
@@ -37,3 +38,6 @@ DELETE project: success
 GET project: key not found
 Keys remaining: 1
 ```
+=======
+Distributed Key-Value Database
+>>>>>>> 60636eeba1ecea8db588f489e3aec1f7bbabbb19
