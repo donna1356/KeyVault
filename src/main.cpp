@@ -8,7 +8,7 @@ using namespace std;
 
 namespace {
 
-std::string toUpper(std::string text) {
+string toUpper(string text) {
     for (char& character : text) {
         character = static_cast<char>(
             toupper(static_cast<unsigned char>(character)));
@@ -27,7 +27,7 @@ void printHelp() {
               << "  EXIT               Stop KeyVault\n";
 }
 
-bool hasExtraArgument(std::istringstream& input) {
+bool hasExtraArgument(istringstream& input) {
     string extra;
     return static_cast<bool>(input >> extra);
 }
@@ -42,10 +42,10 @@ int main() {
     string line;
 
     while (true) {
-        std::cout << "keyvault> " << std::flush;
+        cout << "keyvault> " << flush;
 
-        if (!std::getline(std::cin, line)) {
-            std::cout << "\nInput closed. Stopping KeyVault.\n";
+        if (!getline(cin, line)) {
+            cout << "\nInput closed. Stopping KeyVault.\n";
             break;
         }
 
@@ -67,7 +67,7 @@ int main() {
             getline(input >> ws, value);
 
             if (key.empty() || value.empty()) {
-                std::cout << "Usage: PUT <key> <value>\n";
+                cout << "Usage: PUT <key> <value>\n";
                 continue;
             }
 
@@ -77,7 +77,7 @@ int main() {
             string key;
 
             if (!(input >> key) || hasExtraArgument(input)) {
-                std::cout << "Usage: GET <key>\n";
+                cout << "Usage: GET <key>\n";
                 continue;
             }
 
@@ -98,7 +98,7 @@ int main() {
             if (store.remove(key)) {
                 cout << "OK\n";
             } else {
-                std::cout << "Key not found\n";
+                cout << "Key not found\n";
             }
         } else if (command == "SIZE") {
             if (hasExtraArgument(input)) {
@@ -109,7 +109,7 @@ int main() {
             cout << store.size() << '\n';
         } else if (command == "HELP") {
             if (hasExtraArgument(input)) {
-                std::cout << "Usage: HELP\n";
+                cout << "Usage: HELP\n";
                 continue;
             }
 

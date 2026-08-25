@@ -2,25 +2,25 @@
 
 namespace keyvault {
 
-void KeyValueStore::put(const std::string& key, const std::string& value) {
+void KeyValueStore::put(const string& key, const string& value) {
     data_[key] = value;
 }
 
-std::optional<std::string> KeyValueStore::get(const std::string& key) const {
+optional<string> KeyValueStore::get(const string& key) const {
     const auto item = data_.find(key);
 
     if (item == data_.end()) {
-        return std::nullopt;
+        return nullopt;
     }
 
     return item->second;
 }
 
-bool KeyValueStore::remove(const std::string& key) {
+bool KeyValueStore::remove(const string& key) {
     return data_.erase(key) > 0;
 }
 
-std::size_t KeyValueStore::size() const {
+size_t KeyValueStore::size() const {
     return data_.size();
 }
 
