@@ -4,20 +4,21 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+using namespace std;
 
 namespace {
 
 std::string toUpper(std::string text) {
     for (char& character : text) {
         character = static_cast<char>(
-            std::toupper(static_cast<unsigned char>(character)));
+            toupper(static_cast<unsigned char>(character)));
     }
 
     return text;
 }
 
 void printHelp() {
-    std::cout << "Available commands:\n"
+    cout << "Available commands:\n"
               << "  PUT <key> <value>  Store or update a value\n"
               << "  GET <key>          Read a value\n"
               << "  DELETE <key>       Delete a value\n"
@@ -27,7 +28,7 @@ void printHelp() {
 }
 
 bool hasExtraArgument(std::istringstream& input) {
-    std::string extra;
+    string extra;
     return static_cast<bool>(input >> extra);
 }
 
@@ -36,9 +37,9 @@ bool hasExtraArgument(std::istringstream& input) {
 int main() {
     keyvault::KeyValueStore store;
 
-    std::cout << "KeyVault is running. Type HELP to see the commands.\n";
+    cout << "KeyVault is running. Type HELP to see the commands.\n";
 
-    std::string line;
+    string line;
 
     while (true) {
         std::cout << "keyvault> " << std::flush;
@@ -48,8 +49,8 @@ int main() {
             break;
         }
 
-        std::istringstream input(line);
-        std::string command;
+        istringstream input(line);
+        string command;
         input >> command;
 
         if (command.empty()) {
@@ -59,11 +60,11 @@ int main() {
         command = toUpper(command);
 
         if (command == "PUT") {
-            std::string key;
-            std::string value;
+            string key;
+            string value;
 
             input >> key;
-            std::getline(input >> std::ws, value);
+            getline(input >> ws, value);
 
             if (key.empty() || value.empty()) {
                 std::cout << "Usage: PUT <key> <value>\n";
@@ -71,9 +72,9 @@ int main() {
             }
 
             store.put(key, value);
-            std::cout << "OK\n";
+            cout << "OK\n";
         } else if (command == "GET") {
-            std::string key;
+            string key;
 
             if (!(input >> key) || hasExtraArgument(input)) {
                 std::cout << "Usage: GET <key>\n";
@@ -82,30 +83,30 @@ int main() {
 
             const auto value = store.get(key);
             if (value.has_value()) {
-                std::cout << value.value() << '\n';
+                cout << value.value() << '\n';
             } else {
-                std::cout << "Key not found\n";
+                cout << "Key not found\n";
             }
         } else if (command == "DELETE") {
-            std::string key;
+            string key;
 
             if (!(input >> key) || hasExtraArgument(input)) {
-                std::cout << "Usage: DELETE <key>\n";
+                cout << "Usage: DELETE <key>\n";
                 continue;
             }
 
             if (store.remove(key)) {
-                std::cout << "OK\n";
+                cout << "OK\n";
             } else {
                 std::cout << "Key not found\n";
             }
         } else if (command == "SIZE") {
             if (hasExtraArgument(input)) {
-                std::cout << "Usage: SIZE\n";
+                cout << "Usage: SIZE\n";
                 continue;
             }
 
-            std::cout << store.size() << '\n';
+            cout << store.size() << '\n';
         } else if (command == "HELP") {
             if (hasExtraArgument(input)) {
                 std::cout << "Usage: HELP\n";
@@ -119,10 +120,10 @@ int main() {
                 continue;
             }
 
-            std::cout << "Stopping KeyVault.\n";
+            cout << "Stopping KeyVault.\n";
             break;
         } else {
-            std::cout << "Unknown command. Type HELP to see the commands.\n";
+            cout << "Unknown command. Type HELP to see the commands.\n";
         }
     }
 
