@@ -116,7 +116,7 @@ int main() {
             printHelp();
         } else if (command == "EXIT") {
             if (hasExtraArgument(input)) {
-                std::cout << "Usage: EXIT\n";
+                cout << "Usage: EXIT\n";
                 continue;
             }
 
