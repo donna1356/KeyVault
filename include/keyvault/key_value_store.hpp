@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <shared_mutex>
 using namespace std;
 
 namespace keyvault {
@@ -16,6 +17,7 @@ public:
     size_t size() const;
 
 private:
+    mutable shared_mutex mutex_; //protects the data from unsafe concurrent processes.
     unordered_map<string, string> data_;
 };
 
