@@ -1,24 +1,42 @@
 #pragma once
 
+#include "keyvault/lru_cache.hpp"
+#include "keyvault/persistence.hpp"
+
+#include <chrono>
 #include <cstddef>
 #include <optional>
-#include <string>
-#include <unordered_map>
 #include <shared_mutex>
-using namespace std;
+#include <string>
 
 namespace keyvault {
 
+struct Entry {
+    std::string value;
+    std::optional<std::chrono::system_clock::time_point> expires_at;
+};
+
 class KeyValueStore {
 public:
-    void put(const string& key, const string& value);
-    optional<string> get(const string& key) const;
-    bool remove(const string& key);
-    size_t size() const;
+    explicit KeyValueStore(std::size_t max_capacity = 1000);
+
+    void put(const std::string& key,
+             const std::string& value,
+             std::optional<int> ttl_seconds = std::nullopt);
+    std::optional<std::string> get(const std::string& key);
+    bool remove(const std::string& key);
+    std::size_t size() const;
+    void purge_expired();
+
+    bool save_to_disk(const std::string& path) const;
+    bool load_from_disk(const std::string& path);
+    std::vector<StoredEntry> entries() const;
 
 private:
-    mutable shared_mutex mutex_; //protects the data from unsafe concurrent processes.
-    unordered_map<string, string> data_;
+    bool is_expired(const Entry& entry) const;
+
+    mutable std::shared_mutex mutex_;
+    LRUCache<std::string, Entry> cache_;
 };
 
 }  // namespace keyvault

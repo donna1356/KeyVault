@@ -1,0 +1,144 @@
+#include "keyvault/key_value_store.hpp"
+#include "keyvault/lru_cache.hpp"
+#include "keyvault/protocol.hpp"
+#include "keyvault/replication.hpp"
+
+#include <gtest/gtest.h>
+
+#include <chrono>
+#include <filesystem>
+#include <string>
+#include <thread>
+#include <vector>
+
+namespace {
+
+std::string temp_file_path(const std::string& name) {
+    return (std::filesystem::temp_directory_path() / name).string();
+}
+
+}  // namespace
+
+TEST(LRUCacheTest, EvictsLeastRecentlyUsedEntry) {
+    keyvault::LRUCache<std::string, int> cache(2);
+
+    cache.put("a", 1);
+    cache.put("b", 2);
+    cache.put("c", 3);
+
+    EXPECT_FALSE(cache.get("a").has_value());
+    EXPECT_EQ(cache.get("b"), 2);
+    EXPECT_EQ(cache.get("c"), 3);
+}
+
+TEST(LRUCacheTest, GetUpdatesRecency) {
+    keyvault::LRUCache<std::string, int> cache(2);
+
+    cache.put("a", 1);
+    cache.put("b", 2);
+    EXPECT_EQ(cache.get("a"), 1);
+    cache.put("c", 3);
+
+    EXPECT_EQ(cache.get("a"), 1);
+    EXPECT_FALSE(cache.get("b").has_value());
+    EXPECT_EQ(cache.get("c"), 3);
+}
+
+TEST(KeyValueStoreTest, PutGetRemove) {
+    keyvault::KeyValueStore store;
+
+    store.put("name", "KeyVault");
+    EXPECT_EQ(store.get("name"), "KeyVault");
+    EXPECT_EQ(store.size(), 1U);
+
+    EXPECT_TRUE(store.remove("name"));
+    EXPECT_FALSE(store.get("name").has_value());
+    EXPECT_EQ(store.size(), 0U);
+}
+
+TEST(KeyValueStoreTest, ExpiresKeysAfterTtl) {
+    keyvault::KeyValueStore store;
+
+    store.put("session", "active", 1);
+    EXPECT_EQ(store.get("session"), "active");
+
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    store.purge_expired();
+
+    EXPECT_FALSE(store.get("session").has_value());
+    EXPECT_EQ(store.size(), 0U);
+}
+
+TEST(KeyValueStoreTest, PersistsDataAcrossLoads) {
+    const std::string path = temp_file_path("keyvault_test_snapshot.dat");
+    std::filesystem::remove(path);
+
+    {
+        keyvault::KeyValueStore store;
+        store.put("city", "Bengaluru");
+        ASSERT_TRUE(store.save_to_disk(path));
+    }
+
+    keyvault::KeyValueStore restored_store;
+    ASSERT_TRUE(restored_store.load_from_disk(path));
+    EXPECT_EQ(restored_store.get("city"), "Bengaluru");
+
+    std::filesystem::remove(path);
+}
+
+TEST(KeyValueStoreTest, EnforcesLruCapacity) {
+    keyvault::KeyValueStore store(2);
+
+    store.put("one", "1");
+    store.put("two", "2");
+    EXPECT_EQ(store.get("one"), "1");
+    store.put("three", "3");
+
+    EXPECT_FALSE(store.get("two").has_value());
+    EXPECT_EQ(store.get("one"), "1");
+    EXPECT_EQ(store.get("three"), "3");
+}
+
+TEST(KeyValueStoreTest, HandlesConcurrentAccess) {
+    keyvault::KeyValueStore store;
+
+    auto writer = [&store]() {
+        for (int index = 0; index < 100; ++index) {
+            store.put("counter", std::to_string(index));
+        }
+    };
+
+    auto reader = [&store]() {
+        for (int index = 0; index < 100; ++index) {
+            store.get("counter");
+            store.size();
+        }
+    };
+
+    std::vector<std::thread> threads;
+    threads.emplace_back(writer);
+    threads.emplace_back(reader);
+    threads.emplace_back(reader);
+
+    for (std::thread& thread : threads) {
+        thread.join();
+    }
+
+    EXPECT_TRUE(store.get("counter").has_value());
+}
+
+TEST(ReplicationTest, ParsesPeerAddresses) {
+    const auto peers = keyvault::parse_peer_list("127.0.0.1:7379,127.0.0.1:7380");
+
+    ASSERT_EQ(peers.size(), 2U);
+    EXPECT_EQ(peers[0].host, "127.0.0.1");
+    EXPECT_EQ(peers[0].port, 7379);
+    EXPECT_EQ(peers[1].port, 7380);
+}
+
+TEST(ReplicationTest, BuildsReplicationCommands) {
+    EXPECT_EQ(keyvault::format_repl_set("name", "Donna", std::nullopt),
+              "REPL SET name Donna\n");
+    EXPECT_EQ(keyvault::format_repl_delete("name"), "REPL DELETE name\n");
+    EXPECT_EQ(keyvault::format_repl_end(), "REPL END\n");
+}
