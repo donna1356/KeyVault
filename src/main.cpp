@@ -4,32 +4,59 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-using namespace std;
 
 namespace {
 
-string toUpper(string text) {
+std::string to_upper(std::string text) {
     for (char& character : text) {
         character = static_cast<char>(
-            toupper(static_cast<unsigned char>(character)));
+            std::toupper(static_cast<unsigned char>(character)));
     }
 
     return text;
 }
 
-void printHelp() {
-    cout << "Available commands:\n"
-              << "  PUT <key> <value>  Store or update a value\n"
-              << "  GET <key>          Read a value\n"
-              << "  DELETE <key>       Delete a value\n"
-              << "  SIZE               Show the number of keys\n"
-              << "  HELP               Show this help message\n"
-              << "  EXIT               Stop KeyVault\n";
+void print_help() {
+    std::cout << "Available commands:\n"
+              << "  SET <key> <value> [ttl]  Store or update a value\n"
+              << "  GET <key>                Read a value\n"
+              << "  DELETE <key>             Delete a value\n"
+              << "  SIZE                     Show the number of keys\n"
+              << "  SAVE <path>              Persist data to disk\n"
+              << "  LOAD <path>              Load data from disk\n"
+              << "  HELP                     Show this help message\n"
+              << "  EXIT                     Stop KeyVault\n";
 }
 
-bool hasExtraArgument(istringstream& input) {
-    string extra;
+bool has_extra_argument(std::istringstream& input) {
+    std::string extra;
     return static_cast<bool>(input >> extra);
+}
+
+std::optional<int> parse_ttl(std::string& value) {
+    const std::size_t last_space = value.find_last_of(' ');
+    if (last_space == std::string::npos) {
+        return std::nullopt;
+    }
+
+    const std::string ttl_token = value.substr(last_space + 1);
+    if (ttl_token.empty()) {
+        return std::nullopt;
+    }
+
+    for (const char character : ttl_token) {
+        if (!std::isdigit(static_cast<unsigned char>(character))) {
+            return std::nullopt;
+        }
+    }
+
+    const int ttl_seconds = std::stoi(ttl_token);
+    value = value.substr(0, last_space);
+    if (value.empty()) {
+        return std::nullopt;
+    }
+
+    return ttl_seconds;
 }
 
 }  // namespace
@@ -37,93 +64,125 @@ bool hasExtraArgument(istringstream& input) {
 int main() {
     keyvault::KeyValueStore store;
 
-    cout << "KeyVault is running. Type HELP to see the commands.\n";
+    std::cout << "KeyVault is running. Type HELP to see the commands.\n";
 
-    string line;
+    std::string line;
 
     while (true) {
-        cout << "keyvault> " << flush;
+        std::cout << "keyvault> " << std::flush;
 
-        if (!getline(cin, line)) {
-            cout << "\nInput closed. Stopping KeyVault.\n";
+        if (!std::getline(std::cin, line)) {
+            std::cout << "\nInput closed. Stopping KeyVault.\n";
             break;
         }
 
-        istringstream input(line);
-        string command;
+        std::istringstream input(line);
+        std::string command;
         input >> command;
 
         if (command.empty()) {
             continue;
         }
 
-        command = toUpper(command);
+        command = to_upper(command);
 
-        if (command == "PUT") {
-            string key;
-            string value;
+        if (command == "SET" || command == "PUT") {
+            std::string key;
+            std::string value;
 
             input >> key;
-            getline(input >> ws, value);
+            std::getline(input >> std::ws, value);
 
             if (key.empty() || value.empty()) {
-                cout << "Usage: PUT <key> <value>\n";
+                std::cout << "Usage: SET <key> <value> [ttl_seconds]\n";
                 continue;
             }
 
-            store.put(key, value);
-            cout << "OK\n";
-        } else if (command == "GET") {
-            string key;
+            const auto ttl_seconds = parse_ttl(value);
+            if (!ttl_seconds.has_value() && value.empty()) {
+                std::cout << "Usage: SET <key> <value> [ttl_seconds]\n";
+                continue;
+            }
 
-            if (!(input >> key) || hasExtraArgument(input)) {
-                cout << "Usage: GET <key>\n";
+            store.put(key, value, ttl_seconds);
+            std::cout << "OK\n";
+        } else if (command == "GET") {
+            std::string key;
+
+            if (!(input >> key) || has_extra_argument(input)) {
+                std::cout << "Usage: GET <key>\n";
                 continue;
             }
 
             const auto value = store.get(key);
             if (value.has_value()) {
-                cout << value.value() << '\n';
+                std::cout << value.value() << '\n';
             } else {
-                cout << "Key not found\n";
+                std::cout << "Key not found\n";
             }
         } else if (command == "DELETE") {
-            string key;
+            std::string key;
 
-            if (!(input >> key) || hasExtraArgument(input)) {
-                cout << "Usage: DELETE <key>\n";
+            if (!(input >> key) || has_extra_argument(input)) {
+                std::cout << "Usage: DELETE <key>\n";
                 continue;
             }
 
             if (store.remove(key)) {
-                cout << "OK\n";
+                std::cout << "OK\n";
             } else {
-                cout << "Key not found\n";
+                std::cout << "Key not found\n";
             }
         } else if (command == "SIZE") {
-            if (hasExtraArgument(input)) {
-                cout << "Usage: SIZE\n";
+            if (has_extra_argument(input)) {
+                std::cout << "Usage: SIZE\n";
                 continue;
             }
 
-            cout << store.size() << '\n';
+            std::cout << store.size() << '\n';
+        } else if (command == "SAVE") {
+            std::string path;
+
+            if (!(input >> path) || has_extra_argument(input)) {
+                std::cout << "Usage: SAVE <path>\n";
+                continue;
+            }
+
+            if (store.save_to_disk(path)) {
+                std::cout << "OK\n";
+            } else {
+                std::cout << "Failed to save data\n";
+            }
+        } else if (command == "LOAD") {
+            std::string path;
+
+            if (!(input >> path) || has_extra_argument(input)) {
+                std::cout << "Usage: LOAD <path>\n";
+                continue;
+            }
+
+            if (store.load_from_disk(path)) {
+                std::cout << "OK\n";
+            } else {
+                std::cout << "Failed to load data\n";
+            }
         } else if (command == "HELP") {
-            if (hasExtraArgument(input)) {
-                cout << "Usage: HELP\n";
+            if (has_extra_argument(input)) {
+                std::cout << "Usage: HELP\n";
                 continue;
             }
 
-            printHelp();
+            print_help();
         } else if (command == "EXIT") {
-            if (hasExtraArgument(input)) {
-                cout << "Usage: EXIT\n";
+            if (has_extra_argument(input)) {
+                std::cout << "Usage: EXIT\n";
                 continue;
             }
 
-            cout << "Stopping KeyVault.\n";
+            std::cout << "Stopping KeyVault.\n";
             break;
         } else {
-            cout << "Unknown command. Type HELP to see the commands.\n";
+            std::cout << "Unknown command. Type HELP to see the commands.\n";
         }
     }
 
