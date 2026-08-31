@@ -136,6 +136,24 @@ TEST(ReplicationTest, ParsesPeerAddresses) {
     EXPECT_EQ(peers[1].port, 7380);
 }
 
+TEST(ReplicationTest, RejectsInvalidPeerAddresses) {
+    auto invalid1 = keyvault::parse_peer_address("127.0.0.1:abc");
+    EXPECT_TRUE(invalid1.host.empty());
+    EXPECT_EQ(invalid1.port, 0);
+
+    auto invalid2 = keyvault::parse_peer_address("127.0.0.1:99999");
+    EXPECT_TRUE(invalid2.host.empty());
+    EXPECT_EQ(invalid2.port, 0);
+
+    auto invalid3 = keyvault::parse_peer_address(":7379");
+    EXPECT_TRUE(invalid3.host.empty());
+    EXPECT_EQ(invalid3.port, 0);
+
+    auto invalid4 = keyvault::parse_peer_address("127.0.0.1:");
+    EXPECT_TRUE(invalid4.host.empty());
+    EXPECT_EQ(invalid4.port, 0);
+}
+
 TEST(ReplicationTest, BuildsReplicationCommands) {
     EXPECT_EQ(keyvault::format_repl_set("name", "Donna", std::nullopt),
               "REPL SET name Donna\n");

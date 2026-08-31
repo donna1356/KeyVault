@@ -68,7 +68,8 @@ if(BUILD_TESTING)
     )
 
     include(GoogleTest)
-    gtest_discover_tests(keyvault_tests)
+    gtest_discover_tests(keyvault_tests
+    DISCOVERY_TIMEOUT 30)
 endif()
 
 if(MSVC)

@@ -85,12 +85,30 @@ PeerAddress parse_peer_address(const std::string& peer) {
     PeerAddress address;
 
     const std::size_t separator = peer.rfind(':');
-    if (separator == std::string::npos || separator == peer.size() - 1) {
+
+    if (separator == std::string::npos ||
+        separator == 0 ||
+        separator == peer.size() - 1) {
         return address;
     }
 
-    address.host = peer.substr(0, separator);
-    address.port = static_cast<std::uint16_t>(std::stoi(peer.substr(separator + 1)));
+    const std::string host = peer.substr(0, separator);
+    const std::string port_text = peer.substr(separator + 1);
+
+    try {
+        const long long port = std::stoll(port_text);
+
+        if (port < 1 || port > 65535) {
+            return address;
+        }
+
+        address.host = host;
+        address.port = static_cast<std::uint16_t>(port);
+
+    } catch (...) {
+        return PeerAddress{};
+    }
+
     return address;
 }
 

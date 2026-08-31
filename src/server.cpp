@@ -188,14 +188,27 @@ void Server::handle_client(const int client_fd) {
     close(client_fd);
 }
 
-void Server::send_sync_response(const int client_fd) {
-    for (const StoredEntry& entry : store_.entries()) {
-        const std::string line =
-            format_repl_set(entry.key,
-                            entry.value,
-                            remaining_ttl_seconds(entry.expires_at));
+void Server::send_sync_response(int client_fd) {
+    const auto entries = store_.entries();
 
-        if (!send_all(client_fd, line)) {
+    for (const auto& entry : entries) {
+        const auto ttl = remaining_ttl_seconds(entry.expires_at);
+
+        // The key had an expiry time but has now expired.
+        // Do not replicate it.
+        if (entry.expires_at.has_value() &&
+            (!ttl.has_value() || *ttl <= 0)) {
+            continue;
+        }
+
+        const std::string command =
+            format_repl_set(
+                entry.key,
+                entry.value,
+                ttl
+            );
+
+        if (!send_all(client_fd, command)) {
             return;
         }
     }
@@ -204,19 +217,31 @@ void Server::send_sync_response(const int client_fd) {
 }
 
 std::optional<int> Server::remaining_ttl_seconds(
-    const std::optional<std::chrono::system_clock::time_point>& expires_at) const {
+    const std::optional<std::chrono::system_clock::time_point>& expires_at
+) const {
+    // No expiry means this key is permanent.
     if (!expires_at.has_value()) {
         return std::nullopt;
     }
 
-    const auto remaining = std::chrono::duration_cast<std::chrono::seconds>(
-        expires_at.value() - std::chrono::system_clock::now());
+    const auto now = std::chrono::system_clock::now();
 
-    if (remaining.count() <= 0) {
-        return std::nullopt;
+    // Already expired.
+    if (*expires_at <= now) {
+        return 0;
     }
 
-    return static_cast<int>(remaining.count());
+    const auto remaining_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            *expires_at - now
+        ).count();
+
+    // Round UP instead of down.
+    // Example: 500 ms remaining -> 1 second, not 0.
+    const long long remaining_seconds =
+        (remaining_ms + 999) / 1000;
+
+    return static_cast<int>(remaining_seconds);
 }
 
 void Server::expiration_loop() {

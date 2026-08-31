@@ -36,6 +36,7 @@ std::string unescape(const std::string& text) {
     for (std::size_t index = 0; index < text.size(); ++index) {
         if (text[index] == '\\' && index + 1 < text.size()) {
             const char next = text[++index];
+
             if (next == 'n') {
                 unescaped += '\n';
             } else if (next == 'r') {
@@ -55,9 +56,12 @@ std::string unescape(const std::string& text) {
 
 }  // namespace
 
-bool Persistence::save(const std::string& path,
-                       const std::vector<StoredEntry>& entries) {
+bool Persistence::save(
+    const std::string& path,
+    const std::vector<StoredEntry>& entries
+) {
     std::ofstream output(path, std::ios::trunc);
+
     if (!output) {
         return false;
     }
@@ -65,32 +69,48 @@ bool Persistence::save(const std::string& path,
     output << kSnapshotHeader << '\n';
 
     for (const StoredEntry& entry : entries) {
-        const auto expiry_ms =
-            entry.expires_at.has_value()
-                ? std::chrono::duration_cast<std::chrono::milliseconds>(
-                      entry.expires_at->time_since_epoch())
-                      .count()
-                : 0;
+        long long expiry_ms = 0;
 
-        output << escape(entry.key) << '\t' << escape(entry.value) << '\t'
-               << expiry_ms << '\n';
+        if (entry.expires_at.has_value()) {
+            expiry_ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    entry.expires_at->time_since_epoch()
+                ).count();
+        }
+
+        output << escape(entry.key)
+               << '\t'
+               << escape(entry.value)
+               << '\t'
+               << expiry_ms
+               << '\n';
     }
 
     return static_cast<bool>(output);
 }
 
-std::vector<StoredEntry> Persistence::load(const std::string& path) {
+bool Persistence::load(
+    const std::string& path,
+    std::vector<StoredEntry>& entries
+) {
     std::ifstream input(path);
-    if (!input) {
-        return {};
+
+    if (!input.is_open()) {
+        return false;
     }
 
     std::string header;
-    if (!std::getline(input, header) || header != kSnapshotHeader) {
-        return {};
+
+    if (!std::getline(input, header)) {
+        return false;
     }
 
-    std::vector<StoredEntry> entries;
+    if (header != kSnapshotHeader) {
+        return false;
+    }
+
+    std::vector<StoredEntry> loaded_entries;
+
     std::string line;
 
     while (std::getline(input, line)) {
@@ -99,29 +119,47 @@ std::vector<StoredEntry> Persistence::load(const std::string& path) {
         }
 
         std::istringstream stream(line);
+
         std::string encoded_key;
         std::string encoded_value;
-        long long expiry_ms = 0;
+        std::string expiry_text;
 
-        if (!std::getline(stream, encoded_key, '\t') ||
-            !std::getline(stream, encoded_value, '\t') ||
-            !(stream >> expiry_ms)) {
+        if (!std::getline(stream, encoded_key, '\t')) {
+            continue;
+        }
+
+        if (!std::getline(stream, encoded_value, '\t')) {
+            continue;
+        }
+
+        if (!std::getline(stream, expiry_text)) {
             continue;
         }
 
         StoredEntry entry;
+
         entry.key = unescape(encoded_key);
         entry.value = unescape(encoded_value);
 
-        if (expiry_ms > 0) {
-            entry.expires_at = std::chrono::system_clock::time_point(
-                std::chrono::milliseconds(expiry_ms));
+        try {
+            const long long expiry_ms = std::stoll(expiry_text);
+
+            if (expiry_ms > 0) {
+                entry.expires_at =
+                    std::chrono::system_clock::time_point(
+                        std::chrono::milliseconds(expiry_ms)
+                    );
+            }
+        } catch (...) {
+            continue;
         }
 
-        entries.push_back(std::move(entry));
+        loaded_entries.push_back(std::move(entry));
     }
 
-    return entries;
+    entries = std::move(loaded_entries);
+
+    return true;
 }
 
 }  // namespace keyvault

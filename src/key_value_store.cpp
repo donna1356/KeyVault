@@ -80,21 +80,32 @@ bool KeyValueStore::save_to_disk(const std::string& path) const {
 }
 
 bool KeyValueStore::load_from_disk(const std::string& path) {
-    const std::vector<StoredEntry> entries = Persistence::load(path);
+    std::vector<StoredEntry> entries;
 
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    // If the file is missing or invalid, do NOT destroy
+    // the data currently present in memory.
+    if (!Persistence::load(path, entries)) {
+        return false;
+    }
+
+    std::unique_lock lock(mutex_);
+
     cache_.clear();
 
     const auto now = std::chrono::system_clock::now();
-    for (const StoredEntry& stored : entries) {
-        if (stored.expires_at.has_value() && stored.expires_at.value() <= now) {
+
+    for (const auto& entry : entries) {
+
+        // Do not restore keys that have already expired.
+        if (entry.expires_at && *entry.expires_at <= now) {
             continue;
         }
 
-        Entry entry;
-        entry.value = stored.value;
-        entry.expires_at = stored.expires_at;
-        cache_.put(stored.key, std::move(entry));
+        Entry value;
+        value.value = entry.value;
+        value.expires_at = entry.expires_at;
+
+        cache_.put(entry.key, std::move(value));
     }
 
     return true;

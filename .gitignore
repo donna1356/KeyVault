@@ -1,6 +1,6 @@
 build/
 .DS_Store
 *.log
-keyvault
+/keyvault
 keyvault.dat
 *.dat
