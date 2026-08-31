@@ -43,8 +43,17 @@ bool KeyValueStore::remove(const std::string& key) {
 }
 
 std::size_t KeyValueStore::size() const {
-    std::shared_lock<std::shared_mutex> lock(mutex_);
-    return cache_.size();
+    std::shared_lock lock(mutex_);
+
+    std::size_t count = 0;
+
+    for (const auto& item : cache_.entries()) {
+        if (!is_expired(item.second)) {
+            ++count;
+        }
+    }
+
+    return count;
 }
 
 void KeyValueStore::purge_expired() {
